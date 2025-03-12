@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import {Label} from "@/components/ui/label";
+import {Input} from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +15,16 @@ import {
 import { Shield, LogOut, Database, Users, Settings } from "lucide-react";
 import { UserTable } from "@/components/user/user-table";
 import { Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Download, Send } from "lucide-react";
 
 type UserStats = {
   totalUsers: number;
@@ -25,6 +37,18 @@ export default function AdminUsersPage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+  });
+  const [notification, setNotification] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchUserStats() {
@@ -48,6 +72,106 @@ export default function AdminUsersPage() {
 
     fetchUserStats();
   }, []);
+
+  // Handle adding a new user
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+
+    try {
+      const response = await fetch("/api/user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newUserData,
+          role: "USER",
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to create user");
+      }
+
+      setActionSuccess("User created successfully!");
+      setNewUserData({ firstName: "", lastName: "", email: "", password: "" });
+      setAddUserOpen(false);
+
+      // Refresh user stats after adding
+      fetchUserStats();
+    } catch (err) {
+      console.error("Error creating user:", err);
+      setError(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle exporting user data
+  const handleExportUserData = async () => {
+    setActionLoading(true);
+
+    try {
+      const response = await fetch("/api/user/export");
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to export data");
+      }
+
+      const data = await response.json();
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(data.users, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `user-data-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setActionSuccess("User data exported successfully!");
+    } catch (err) {
+      console.error("Error exporting user data:", err);
+      setError(err instanceof Error ? err.message : "Failed to export data");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle sending notification
+  const handleSendNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+
+    try {
+      const response = await fetch("/api/notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: notification }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to send notification");
+      }
+
+      setActionSuccess("Notification sent to all users!");
+      setNotification("");
+      setNotificationOpen(false);
+    } catch (err) {
+      console.error("Error sending notification:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to send notification"
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -163,26 +287,156 @@ export default function AdminUsersPage() {
                   ) : null}
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle>User Actions</CardTitle>
                   <CardDescription>Manage user accounts</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button className="w-full">Add New User</Button>
-                  <Button variant="outline" className="w-full">
+                  {actionSuccess && (
+                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md mb-3">
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        {actionSuccess}
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    className="w-full"
+                    onClick={() => setAddUserOpen(true)}
+                  >
+                    Add New User
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleExportUserData}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
                     Export User Data
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setNotificationOpen(true)}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
                     Send Notification to All Users
                   </Button>
                 </CardContent>
-              </Card>
+              </Card>{" "}
             </div>
           </div>
         </main>
       </div>
+      <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogDescription>Create a new user account.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddUser}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={newUserData.firstName}
+                    onChange={(e) =>
+                      setNewUserData({
+                        ...newUserData,
+                        firstName: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={newUserData.lastName}
+                    onChange={(e) =>
+                      setNewUserData({
+                        ...newUserData,
+                        lastName: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUserData.email}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, email: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={newUserData.password}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, password: e.target.value })
+                  }
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={actionLoading}>
+                {actionLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Create User
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Notification Dialog */}
+      <Dialog open={notificationOpen} onOpenChange={setNotificationOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Send Notification</DialogTitle>
+            <DialogDescription>
+              Send a notification to all users.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendNotification}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="notification">Message</Label>
+                <Textarea
+                  id="notification"
+                  placeholder="Enter your notification message..."
+                  value={notification}
+                  onChange={(e) => setNotification(e.target.value)}
+                  required
+                  rows={5}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={actionLoading}>
+                {actionLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Send Notification
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

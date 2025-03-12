@@ -287,57 +287,108 @@
 //   )
 // }
 
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState ,useCallback} from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Shield, LogOut, Search, MapPin, History, Settings, Lock, AlertCircle, Loader2 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { LocationPicker } from "@/components/location/location-picker"
-import { useAuth } from "@/components/auth/auth-provider"
+import { useState, useCallback } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Shield,
+  LogOut,
+  Search,
+  MapPin,
+  History,
+  Settings,
+  Lock,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { LocationPicker } from "@/components/location/location-picker";
+import { useAuth } from "@/components/auth/auth-provider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface SearchResult {
-  id: string
-  name: string
-  category: string
-  distance: number
-  rating: number
+  id: string;
+  name: string;
+  category: string;
+  distance: number;
+  rating: number;
 }
 
 export default function UserDashboard() {
-  const { user, logout } = useAuth()
-  const [isSearching, setIsSearching] = useState(false)
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [searchRadius, setSearchRadius] = useState([500])
-  const [privacyLevel, setPrivacyLevel] = useState("high")
-  const [encryptedLocation, setEncryptedLocation] = useState<{ latitude: string; longitude: string } | null>(null)
-  const [category, setCategory] = useState("all")
-  const [anonymous, setAnonymous] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { user, logout } = useAuth();
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchRadius, setSearchRadius] = useState([500]);
+  const [privacyLevel, setPrivacyLevel] = useState("high");
+  const [encryptedLocation, setEncryptedLocation] = useState<{
+    latitude: string;
+    longitude: string;
+  } | null>(null);
+  const [category, setCategory] = useState("all");
+  const [anonymous, setAnonymous] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLocationSelected = useCallback((location: { latitude: string; longitude: string }) => {
-    setEncryptedLocation(location)
-}, []);
+  const [selectedPoi, setSelectedPoi] = useState<SearchResult | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+
+  const handleLocationSelected = useCallback(
+    (location: { latitude: string; longitude: string }) => {
+      setEncryptedLocation(location);
+    },
+    []
+  );
+
+  const handleShowDetails = (poi: SearchResult) => {
+    setSelectedPoi(poi);
+    setShowDetails(true);
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!encryptedLocation) {
-      setError("Please select a location first")
-      return
+      setError("Please select a location first");
+      return;
     }
 
-    setIsSearching(true)
-    setSearchResults([])
-    setError(null)
+    setIsSearching(true);
+    setSearchResults([]);
+    setError(null);
 
     try {
       const response = await fetch("/api/poi/search", {
@@ -352,23 +403,67 @@ export default function UserDashboard() {
           privacyLevel,
           anonymous,
         }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Search failed")
+        const data = await response.json();
+        throw new Error(data.error || "Search failed");
       }
 
-      const data = await response.json()
-      console.log("Search results:", data.results)
-      setSearchResults(data.results || [])
+      const data = await response.json();
+      console.log("Search results:", data.results);
+      setSearchResults(data.results || []);
     } catch (error) {
-      console.error("Search error:", error)
-      setError(error instanceof Error ? error.message : "An error occurred during search")
+      console.error("Search error:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "An error occurred during search"
+      );
     } finally {
-      setIsSearching(false)
+      setIsSearching(false);
     }
-  }
+  };
+
+  const renderPoiDetails = () => {
+    if (!selectedPoi) return null;
+
+    return (
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{selectedPoi.name}</DialogTitle>
+            <DialogDescription>
+              {selectedPoi.category} • {selectedPoi.distance}m away
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Rating</span>
+              <span className="font-medium">{selectedPoi.rating} ★</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Category</span>
+              <span className="font-medium">{selectedPoi.category}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Distance</span>
+              <span className="font-medium">{selectedPoi.distance}m</span>
+            </div>
+            <div className="bg-primary/5 p-3 rounded-md border border-primary/10">
+              <p className="text-sm text-muted-foreground">
+                This information was retrieved while preserving your location
+                privacy through encrypted queries.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowDetails(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -395,7 +490,10 @@ export default function UserDashboard() {
             <History className="h-5 w-5" />
             <span>Search History</span>
           </Link>
-          <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted text-muted-foreground">
+          <Link
+            href="#"
+            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted text-muted-foreground"
+          >
             <Settings className="h-5 w-5" />
             <span>Preferences</span>
           </Link>
@@ -415,7 +513,9 @@ export default function UserDashboard() {
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">User Dashboard</h1>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
+              <span className="text-sm text-muted-foreground">
+                {user?.email}
+              </span>
               <Button variant="ghost" size="sm" onClick={() => logout()}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -430,7 +530,10 @@ export default function UserDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Privacy-Preserving Search</CardTitle>
-                  <CardDescription>Search for Points of Interest without revealing your exact location</CardDescription>
+                  <CardDescription>
+                    Search for Points of Interest without revealing your exact
+                    location
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSearch} className="space-y-4">
@@ -443,20 +546,31 @@ export default function UserDashboard() {
 
                     <div className="space-y-2">
                       <Label>Your Location (Encrypted)</Label>
-                      <LocationPicker onLocationSelected={handleLocationSelected} privacyLevel={privacyLevel} />
+                      <LocationPicker
+                        onLocationSelected={handleLocationSelected}
+                        privacyLevel={privacyLevel}
+                      />
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="category">Category</Label>
-                      <Select defaultValue="all" value={category} onValueChange={setCategory}>
+                      <Select
+                        defaultValue="all"
+                        value={category}
+                        onValueChange={setCategory}
+                      >
                         <SelectTrigger id="category">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Categories</SelectItem>
-                          <SelectItem value="Restaurant">Restaurants</SelectItem>
+                          <SelectItem value="Restaurant">
+                            Restaurants
+                          </SelectItem>
                           <SelectItem value="Hotel">Hotels</SelectItem>
-                          <SelectItem value="Attraction">Attractions</SelectItem>
+                          <SelectItem value="Attraction">
+                            Attractions
+                          </SelectItem>
                           <SelectItem value="Shopping">Shopping</SelectItem>
                           <SelectItem value="Healthcare">Healthcare</SelectItem>
                           <SelectItem value="Park">Parks</SelectItem>
@@ -466,7 +580,9 @@ export default function UserDashboard() {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="radius">Search Radius: {searchRadius[0]}m</Label>
+                        <Label htmlFor="radius">
+                          Search Radius: {searchRadius[0]}m
+                        </Label>
                       </div>
                       <Slider
                         id="radius"
@@ -480,24 +596,39 @@ export default function UserDashboard() {
 
                     <div className="space-y-2">
                       <Label htmlFor="privacy-level">Privacy Level</Label>
-                      <Select value={privacyLevel} onValueChange={setPrivacyLevel}>
+                      <Select
+                        value={privacyLevel}
+                        onValueChange={setPrivacyLevel}
+                      >
                         <SelectTrigger id="privacy-level">
                           <SelectValue placeholder="Select privacy level" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="high">High (Most Secure)</SelectItem>
+                          <SelectItem value="high">
+                            High (Most Secure)
+                          </SelectItem>
                           <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="low">Low (Faster Results)</SelectItem>
+                          <SelectItem value="low">
+                            Low (Faster Results)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <Switch id="anonymous" checked={anonymous} onCheckedChange={setAnonymous} />
+                      <Switch
+                        id="anonymous"
+                        checked={anonymous}
+                        onCheckedChange={setAnonymous}
+                      />
                       <Label htmlFor="anonymous">Anonymous Search</Label>
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={isSearching || !encryptedLocation}>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={isSearching || !encryptedLocation}
+                    >
                       {isSearching ? "Searching..." : "Search POIs"}
                     </Button>
                   </form>
@@ -516,24 +647,33 @@ export default function UserDashboard() {
                       Encryption Details
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Your location is encrypted using Predicate-Only Encryption (POE) before being sent to the server.
-                      This ensures that your exact coordinates remain private.
+                      Your location is encrypted using Predicate-Only Encryption
+                      (POE) before being sent to the server. This ensures that
+                      your exact coordinates remain private.
                     </p>
                   </div>
 
                   <div className="text-sm space-y-2">
                     <div className="flex justify-between">
                       <span>Encryption Method:</span>
-                      <span className="font-medium">Predicate-Only Encryption</span>
+                      <span className="font-medium">
+                        Predicate-Only Encryption
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Privacy Level:</span>
-                      <span className="font-medium capitalize">{privacyLevel}</span>
+                      <span className="font-medium capitalize">
+                        {privacyLevel}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Location Precision:</span>
                       <span className="font-medium">
-                        {privacyLevel === "high" ? "Low (Obfuscated)" : privacyLevel === "medium" ? "Medium" : "High"}
+                        {privacyLevel === "high"
+                          ? "Low (Obfuscated)"
+                          : privacyLevel === "medium"
+                          ? "Medium"
+                          : "High"}
                       </span>
                     </div>
                   </div>
@@ -545,13 +685,17 @@ export default function UserDashboard() {
               <Card className="h-full">
                 <CardHeader>
                   <CardTitle>Search Results</CardTitle>
-                  <CardDescription>Privacy-preserving POIs near your location</CardDescription>
+                  <CardDescription>
+                    Privacy-preserving POIs near your location
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isSearching ? (
                     <div className="flex flex-col items-center justify-center h-64 space-y-4">
                       <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                      <p className="text-muted-foreground">Searching for POIs...</p>
+                      <p className="text-muted-foreground">
+                        Searching for POIs...
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Your location remains encrypted during this process
                       </p>
@@ -565,18 +709,26 @@ export default function UserDashboard() {
                             <TableHead>Category</TableHead>
                             <TableHead>Distance</TableHead>
                             <TableHead>Rating</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="text-right">
+                              Actions
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {searchResults.map((poi) => (
                             <TableRow key={poi.id}>
-                              <TableCell className="font-medium">{poi.name}</TableCell>
+                              <TableCell className="font-medium">
+                                {poi.name}
+                              </TableCell>
                               <TableCell>{poi.category}</TableCell>
                               <TableCell>{poi.distance}m</TableCell>
                               <TableCell>{poi.rating} ★</TableCell>
                               <TableCell className="text-right">
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleShowDetails(poi)}
+                                >
                                   Details
                                 </Button>
                               </TableCell>
@@ -588,8 +740,12 @@ export default function UserDashboard() {
                   ) : (
                     <div className="flex flex-col items-center justify-center h-64 space-y-4">
                       <MapPin className="h-16 w-16 text-muted-foreground/30" />
-                      <p className="text-muted-foreground">No search results yet</p>
-                      <p className="text-xs text-muted-foreground">Use the search form to find POIs near you</p>
+                      <p className="text-muted-foreground">
+                        No search results yet
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Use the search form to find POIs near you
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -598,7 +754,7 @@ export default function UserDashboard() {
           </div>
         </main>
       </div>
+      {renderPoiDetails()}
     </div>
-  )
+  );
 }
-

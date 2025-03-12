@@ -47,15 +47,43 @@ export function LocationPicker({ onLocationSelected, privacyLevel }: LocationPic
 
   // Simulate location detection on component mount
   useEffect(() => {
-    // For demo purposes, use a mock location
-    const mockLocation = { latitude: 37.7749, longitude: -122.4194 }
-    setLocation(mockLocation)
-
-    // Encrypt location
-    const encryptedLocation = encryptLocation(mockLocation.latitude, mockLocation.longitude)
-    onLocationSelected(encryptedLocation)
-  }, [onLocationSelected])
-
+    // Set loading state while getting location
+    setLoading(true);
+    
+    // Use the browser's geolocation API to get the user's actual location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          
+          // Update state with the real location
+          setLocation(userLocation);
+          
+          // Encrypt location and call the callback
+          const encryptedLocation = encryptLocation(userLocation.latitude, userLocation.longitude);
+          onLocationSelected(encryptedLocation);
+          
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setError("Unable to retrieve your location");
+          setLoading(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    } else {
+      setError("Geolocation is not supported by your browser");
+      setLoading(false);
+    }
+  }, [onLocationSelected]);
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
